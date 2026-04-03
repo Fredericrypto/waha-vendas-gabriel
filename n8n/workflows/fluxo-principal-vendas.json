@@ -1,0 +1,93 @@
+{
+  "name": "🤖 Fluxo Principal de Vendas — waha-vendas-gabriel",
+  "nodes": [
+    {
+      "parameters": {
+        "events": ["message"],
+        "session": "default"
+      },
+      "name": "📨 WAHA — Recebe Mensagem",
+      "type": "@devlikeapro/n8n-nodes-waha.wahaWebhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "waha-vendas-gabriel-main"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==============================================\n// EXTRAI dados essenciais da mensagem recebida\n// ==============================================\nconst payload = $input.first().json;\n\n// Pega o telefone sem @c.us (ex: 5548999999999)\nconst telefone = (payload.payload?.from || payload.from || '')\n  .replace('@c.us', '')\n  .replace('@lid', '');\n\n// Texto da mensagem (minúsculo para comparações)\nconst texto = (\n  payload.payload?.body ||\n  payload.payload?.text ||\n  payload.body ||\n  ''\n).trim();\n\nconst textoLower = texto.toLowerCase();\n\n// Nome do contato (se disponível)\nconst nome = payload.payload?.notifyName ||\n             payload._data?.notifyName ||\n             'Lead';\n\n// ID único da mensagem\nconst messageId = payload.id || payload.payload?.id || '';\n\n// Ignora mensagens próprias (enviadas pelo bot)\nif (payload.payload?.fromMe === true || payload.fromMe === true) {\n  return [{ json: { ignorar: true } }];\n}\n\nreturn [{\n  json: {\n    telefone,\n    texto,\n    textoLower,\n    nome,\n    messageId,\n    ignorar: false\n  }\n}];"
+      },
+      "name": "⚙️ Extrai Dados da Mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ignorar }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "🚫 É mensagem própria?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "lookup",
+        "documentId": { "value": "COLE_O_ID_DA_PLANILHA_AQUI" },
+        "sheetName": { "value": "Sheet1" },
+        "lookupColumn": "telefone",
+        "lookupValue": "={{ $('⚙️ Extrai Dados da Mensagem').item.json.telefone }}"
+      },
+      "name": "📊 Busca Lead no Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [900, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "name": "Google - waha-vendas-gabriel" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==============================================\n// DETERMINA o estado atual do lead\n// Se não existe na planilha = lead NOVO\n// ==============================================\nconst dadosMensagem = $('⚙️ Extrai Dados da Mensagem').item.json;\nconst resultadoSheets = $input.first().json;\n\n// Se não achou na planilha, é lead novo\nconst leadExiste = resultadoSheets.telefone !== undefined;\n\nconst status = leadExiste\n  ? (resultadoSheets.status || 'NOVO')\n  : 'NOVO';\n\nconst nomeConhecido = leadExiste\n  ? (resultadoSheets.nome || dadosMensagem.nome)\n  : dadosMensagem.nome;\n\nreturn [{\n  json: {\n    ...dadosMensagem,\n    status,\n    nomeConhecido,\n    leadExiste,\n    interesse: resultadoSheets.interesse || '',\n    disponibilidade: resultadoSheets.disponibilidade || ''\n  }\n}];"
+      },
+      "name": "🧭 Define Estado do Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            { "conditions": { "string": [{ "value1": "={{ $json.status }}", "operation": "equals", "value2": "NOVO" }] }, "renameOutput": true, "outputKey": "NOVO" },
+            { "conditions": { "string": [{ "value1": "={{ $json.status }}", "operation": "equals", "value2": "QUALIF_1" }] }, "renameOutput": true, "outputKey": "QUALIF_1" },
+            { "conditions": { "string": [{ "value1": "={{ $json.status }}", "operation": "equals", "value2": "QUALIF_2" }] }, "renameOutput": true, "outputKey": "QUALIF_2" },
+            { "conditions": { "string": [{ "value1": "={{ $json.status }}", "operation": "equals", "value2": "QUALIF_3" }] }, "renameOutput": true, "outputKey": "QUALIF_3" },
+            { "conditions": { "string": [{ "value1": "={{ $json.status }}", "operation": "equals", "value2": "AGENDANDO" }] }, "renameOutput": true, "outputKey": "AGENDANDO" },
+            { "conditions": { "string": [{ "value1": "={{ $json.status }}", "operation": "equals", "value2": "MANUAL" }] }, "renameOutput": true, "outputKey": "MANUAL" }
+          ]
+        }
+      },
+      "name": "🔀 Roteador por Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1340, 200]
+    }
+  ],
+  "connections": {
+    "📨 WAHA — Recebe Mensagem": { "main": [[{ "node": "⚙️ Extrai Dados da Mensagem", "type": "main", "index": 0 }]] },
+    "⚙️ Extrai Dados da Mensagem": { "main": [[{ "node": "🚫 É mensagem própria?", "type": "main", "index": 0 }]] },
+    "🚫 É mensagem própria?": { "main": [[], [{ "node": "📊 Busca Lead no Sheets", "type": "main", "index": 0 }]] },
+    "📊 Busca Lead no Sheets": { "main": [[{ "node": "🧭 Define Estado do Lead", "type": "main", "index": 0 }]] },
+    "🧭 Define Estado do Lead": { "main": [[{ "node": "🔀 Roteador por Status", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
