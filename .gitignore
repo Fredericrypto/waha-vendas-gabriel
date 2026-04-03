@@ -1,0 +1,26 @@
+# ============================================================
+# .gitignore — waha-vendas-gabriel
+# Protege dados sensíveis e volumes do Docker
+# ============================================================
+
+# Variáveis de ambiente (NUNCA subir para o GitHub!)
+.env
+.env.local
+.env.production
+
+# Volumes do Docker (dados persistentes)
+docker/volumes/
+
+# Logs
+*.log
+logs/
+
+# Node
+node_modules/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Credenciais n8n exportadas
+n8n/credentials/*.json
