@@ -8,7 +8,6 @@ services:
 
   # ----------------------------------------------------------
   # PostgreSQL — Banco de dados para o n8n
-  # Muito mais robusto que o SQLite padrão do n8n
   # ----------------------------------------------------------
   postgres:
     image: postgres:16-alpine
@@ -30,7 +29,6 @@ services:
 
   # ----------------------------------------------------------
   # Redis — Fila de execução para o n8n
-  # Garante que as automações não se percam se cair
   # ----------------------------------------------------------
   redis:
     image: redis:7-alpine
@@ -49,7 +47,8 @@ services:
 
   # ----------------------------------------------------------
   # WAHA — WhatsApp HTTP API (engine NOWEB = sem Chromium)
-  # Engine mais leve e estável para automação
+  # WHATSAPP_HOOK_URL aponta para o webhook correto do n8n
+  # WHATSAPP_RESTART_ALL_SESSIONS reconecta automaticamente
   # ----------------------------------------------------------
   waha:
     image: devlikeapro/waha:latest
@@ -58,18 +57,13 @@ services:
     ports:
       - "${WAHA_PORT}:3000"
     environment:
-      # Chave de segurança da API
       - WHATSAPP_API_KEY=${WAHA_API_KEY}
-      # Engine NOWEB = não precisa de navegador, muito mais leve
       - WHATSAPP_DEFAULT_ENGINE=NOWEB
-      # Usuário e senha do painel visual do WAHA
       - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USER}
       - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASS}
-      # Quais eventos disparam o webhook para o n8n
-      - WHATSAPP_HOOK_EVENTS=message,message.ack,session.status
-      # URL do webhook: aponta para o n8n dentro da mesma rede Docker
-      # IMPORTANTE: usa nome do serviço 'n8n', não 'localhost'
-      - WHATSAPP_HOOK_URL=http://n8n:5678/webhook/waha
+      - WHATSAPP_HOOK_EVENTS=message
+      - WHATSAPP_HOOK_URL=http://n8n:5678/webhook/a209f623-bdb1-48c6-a535-7996c4405502/waha
+      - WHATSAPP_RESTART_ALL_SESSIONS=true
       - TZ=${TIMEZONE}
     volumes:
       - ./docker/volumes/waha_sessions:/app/.sessions
@@ -81,7 +75,6 @@ services:
 
   # ----------------------------------------------------------
   # n8n — Plataforma de automação visual (open source)
-  # Configurado com PostgreSQL + Redis para produção
   # ----------------------------------------------------------
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
@@ -90,29 +83,24 @@ services:
     ports:
       - "${N8N_PORT}:5678"
     environment:
-      # Banco de dados PostgreSQL (não usa SQLite)
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
       - DB_POSTGRESDB_USER=${POSTGRES_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
-      # Fila com Redis
       - EXECUTIONS_MODE=queue
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
       - QUEUE_BULL_REDIS_PASSWORD=${REDIS_PASSWORD}
-      # Segurança e acesso
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      # URL pública do webhook (use seu IP/domínio em produção)
       - WEBHOOK_URL=${WEBHOOK_URL}
       - N8N_HOST=0.0.0.0
       - N8N_PORT=5678
       - GENERIC_TIMEZONE=${TIMEZONE}
-      # Instalar nodes da comunidade (necessário para o WAHA Node)
       - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
     volumes:
       - ./docker/volumes/n8n_data:/home/node/.n8n
@@ -127,7 +115,6 @@ services:
 
   # ----------------------------------------------------------
   # n8n Worker — Processa filas em paralelo
-  # Garante escalabilidade e não trava o processo principal
   # ----------------------------------------------------------
   n8n-worker:
     image: docker.n8n.io/n8nio/n8n:latest
@@ -156,10 +143,6 @@ services:
       - postgres
       - redis
 
-# ----------------------------------------------------------
-# Rede interna Docker
-# Todos os containers se comunicam por nome (ex: "waha", "n8n")
-# ----------------------------------------------------------
 networks:
   waha_vendas_net:
     driver: bridge
