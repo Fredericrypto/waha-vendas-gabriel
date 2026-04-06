@@ -24,9 +24,9 @@ docker compose up -d   # sobe tudo
 
 ## Fases do Projeto
 - [x] Phase 1 — Estrutura e configuração base
-- [ ] Phase 2 — Docker rodando (verde!)
-- [ ] Phase 3 — Fluxo de vendas n8n
-- [ ] Phase 4 — Integração RD Station
-- [ ] Phase 5 — Handoff manual
-- [ ] Phase 6 — Testes e extras
-- [ ] Phase 7 — Manual do usuário PDF
+- [x] Phase 2 — Docker rodando (verde!)
+- [x] Phase 3 — Fluxo de vendas n8n
+- [x] Phase 4 — Integração RD Station
+- [x] Phase 5 — Handoff manual
+- [x] Phase 6 — Testes e extras
+- [x] Phase 7 — Manual do usuário PDF
